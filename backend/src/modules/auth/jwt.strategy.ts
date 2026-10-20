@@ -1,20 +1,20 @@
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import Redis from 'ioredis';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(@Inject('REDIS') private redis: Redis) {
+  constructor() {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET não definido');
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKey: process.env.JWT_SECRET!,
+      secretOrKey: secret,
     });
   }
 
-  async validate(p: any) {
-    if (p.tipo !== 'access' || (await this.redis.exists(`bl:${p.jti}`)))
-      throw new UnauthorizedException();
-    return { id: p.sub, email: p.email, jti: p.jti, exp: p.exp };
+  validate(payload: { sub: number; email: string }) {
+    return { id: payload.sub, email: payload.email };
   }
 }

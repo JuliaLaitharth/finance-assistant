@@ -1,0 +1,146 @@
+.
+├── .github
+│   └── workflows
+│       └── ci.yml
+├── .gitignore
+├── backend
+│   ├── .env
+│   ├── .gitignore
+│   ├── .oxlintrc.json
+│   ├── .prettierrc
+│   ├── jest.config.ts
+│   ├── nest-cli.json
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── prisma
+│   │   ├── migrations
+│   │   │   ├── 20261002051246_init
+│   │   │   │   └── migration.sql
+│   │   │   └── migration_lock.toml
+│   │   └── schema.prisma
+│   ├── README.md
+│   ├── skills-lock.json
+│   ├── src
+│   │   ├── app.controller.spec.ts
+│   │   ├── app.controller.ts
+│   │   ├── app.module.ts
+│   │   ├── app.service.ts
+│   │   ├── main.ts
+│   │   ├── modules
+│   │   │   ├── alertas
+│   │   │   │   ├── alertas.controller.ts
+│   │   │   │   ├── alertas.module.ts
+│   │   │   │   └── alertas.service.ts
+│   │   │   ├── alexa
+│   │   │   │   ├── alexa.controller.ts
+│   │   │   │   ├── alexa.module.ts
+│   │   │   │   └── alexa.service.ts
+│   │   │   ├── auditoria
+│   │   │   │   ├── auditoria.controller.ts
+│   │   │   │   ├── auditoria.module.ts
+│   │   │   │   └── auditoria.service.ts
+│   │   │   ├── auth
+│   │   │   │   ├── auth.controller.ts
+│   │   │   │   ├── auth.module.ts
+│   │   │   │   ├── auth.service.ts
+│   │   │   │   ├── dto
+│   │   │   │   │   └── auth.dto.ts
+│   │   │   │   ├── jwt-auth.guard.ts
+│   │   │   │   └── jwt.strategy.ts
+│   │   │   ├── categorias
+│   │   │   │   ├── categorias.controller.ts
+│   │   │   │   ├── categorias.module.ts
+│   │   │   │   └── categorias.service.ts
+│   │   │   ├── consentimentos
+│   │   │   │   ├── consentimentos.controller.ts
+│   │   │   │   ├── consentimentos.module.ts
+│   │   │   │   └── consentimentos.service.ts
+│   │   │   ├── contas
+│   │   │   │   ├── contas.controller.ts
+│   │   │   │   ├── contas.module.ts
+│   │   │   │   └── contas.service.ts
+│   │   │   ├── mail
+│   │   │   │   └── mail.service.ts
+│   │   │   ├── notificacoes
+│   │   │   │   ├── notificacoes.controller.ts
+│   │   │   │   ├── notificacoes.module.ts
+│   │   │   │   └── notificacoes.service.ts
+│   │   │   ├── pluggy
+│   │   │   │   ├── pluggy.controller.ts
+│   │   │   │   ├── pluggy.module.ts
+│   │   │   │   └── pluggy.service.ts
+│   │   │   ├── transacoes
+│   │   │   │   ├── transacoes.controller.ts
+│   │   │   │   ├── transacoes.module.ts
+│   │   │   │   └── transacoes.service.ts
+│   │   │   └── usuarios
+│   │   │       ├── usuarios.controller.ts
+│   │   │       ├── usuarios.module.ts
+│   │   │       └── usuarios.service.ts
+│   │   ├── pluggy
+│   │   │   ├── pluggy.controller.ts
+│   │   │   ├── pluggy.module.ts
+│   │   │   └── pluggy.service.ts
+│   │   ├── prisma
+│   │   │   ├── prisma.module.ts
+│   │   │   └── prisma.service.ts
+│   │   └── redis
+│   │       └── redis.module.ts
+│   ├── test
+│   │   ├── app.e2e-spec.ts
+│   │   └── jest-e2e.json
+│   ├── tsconfig.build.json
+│   ├── tsconfig.build.tsbuildinfo
+│   └── tsconfig.json
+├── docker-compose.yml
+├── estrutura.txt
+└── mobile
+    ├── .flutter-plugins-dependencies
+    ├── .gitignore
+    ├── .metadata
+    ├── analysis_options.yaml
+    ├── lib
+    │   ├── core
+    │   │   ├── network
+    │   │   ├── storage
+    │   │   └── theme
+    │   ├── data
+    │   │   ├── local
+    │   │   ├── models
+    │   │   └── repositories
+    │   ├── main.dart
+    │   ├── models
+    │   ├── pluggy_connect_page.dart
+    │   ├── screens
+    │   │   ├── login_page.dart
+    │   │   └── register_page.dart
+    │   ├── services
+    │   ├── utils
+    │   ├── viewmodels
+    │   ├── views
+    │   │   ├── alertas
+    │   │   ├── auth
+    │   │   ├── contas
+    │   │   ├── extrato
+    │   │   ├── notificacoes
+    │   │   └── saldo
+    │   └── widgets
+    ├── mobile.iml
+    ├── pluggy
+    │   ├── pluggy.controller.spec.ts
+    │   ├── pluggy.controller.ts
+    │   ├── pluggy.module.ts
+    │   ├── pluggy.service.spec.ts
+    │   └── pluggy.service.ts
+    ├── pubspec.lock
+    ├── pubspec.yaml
+    ├── README.md
+    ├── src
+    │   └── services
+    │       ├── auth.ts
+    │       ├── pluggy_service.dart
+    │       └── token_storage.dart
+    └── test
+        └── widget_test.dart
+
+53 directories, 91 files

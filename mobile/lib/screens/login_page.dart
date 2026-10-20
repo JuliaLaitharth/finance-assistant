@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'register_page.dart';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -206,11 +207,15 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       const Text('Não tem conta?'),
                       TextButton(
-                        onPressed: () {/* TODO: tela de cadastro */},
-                        child: const Text('Cadastre-se'),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const RegisterPage()),
+                       ),
+                      child: const Text('Cadastre-se'),
                       ),
                     ],
                   ),
+
                 ],
               ),
             ),
