@@ -2,12 +2,12 @@ import { Inject, Injectable, ConflictException, UnauthorizedException,
   ForbiddenException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { randomBytes, createHash } from 'crypto';
-import { v4 as uuid } from 'uuid';
 import Redis from 'ioredis';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { CadastroDto, LoginDto, RedefinirSenhaDto } from './dto/auth.dto';
+import { randomBytes, createHash, randomUUID } from 'crypto';
+
 
 const MAX_TENTATIVAS = 5;
 const BLOQUEIO_MIN = 15;
@@ -136,17 +136,18 @@ export class AuthService {
   }
 
   // ---------- auxiliares ----------
-  private async gerarTokens(sub: number, email: string) {
+    private async gerarTokens(sub: number, email: string) {
     const accessToken = await this.jwt.signAsync(
-      { sub, email, tipo: 'access', jti: uuid() },
+      { sub, email, tipo: 'access', jti: randomUUID() },
       { secret: process.env.JWT_SECRET, expiresIn: '15m' },
     );
     const refreshToken = await this.jwt.signAsync(
-      { sub, email, tipo: 'refresh', jti: uuid() },
+      { sub, email, tipo: 'refresh', jti: randomUUID() },
       { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' },
     );
     return { accessToken, refreshToken };
   }
+
 
   private async revogar(jti: string, exp: number) {
     const ttl = exp - Math.floor(Date.now() / 1000);

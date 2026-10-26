@@ -1,0 +1,898 @@
+
+===== ./backend/src/main.ts =====
+import { ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
+  app.enableCors();
+  await app.listen(3000, '0.0.0.0');
+}
+bootstrap();
+
+===== ./backend/src/redis/redis.module.ts =====
+import { Global, Module } from '@nestjs/common';
+import Redis from 'ioredis';
+
+@Global()
+@Module({
+  providers: [{ provide: 'REDIS', useFactory: () => new Redis(process.env.REDIS_URL!) }],
+  exports: ['REDIS'],
+})
+export class RedisModule {}
+
+===== ./backend/src/app.service.ts =====
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class AppService {
+  getHello(): string {
+    return 'Hello World!';
+  }
+}
+
+===== ./backend/src/prisma/prisma.service.ts =====
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+
+@Injectable()
+export class PrismaService extends PrismaClient implements OnModuleInit {
+  async onModuleInit() { await this.$connect(); }
+}
+
+===== ./backend/src/prisma/prisma.module.ts =====
+import { Global, Module } from '@nestjs/common';
+import { PrismaService } from './prisma.service';
+
+@Global()
+@Module({ providers: [PrismaService], exports: [PrismaService] })
+export class PrismaModule {}
+
+===== ./backend/src/app.module.ts =====
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { PrismaModule } from './prisma/prisma.module';
+import { RedisModule } from './redis/redis.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsuariosModule } from './modules/usuarios/usuarios.module';
+import { PluggyModule } from './modules/pluggy/pluggy.module';
+
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    RedisModule,
+    AuthModule,
+    UsuariosModule,
+    PluggyModule,
+  ],
+})
+export class AppModule {}
+
+===== ./backend/src/app.controller.spec.ts =====
+import { Test, TestingModule } from '@nestjs/testing';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+
+describe('AppController', () => {
+  let appController: AppController;
+
+  beforeEach(async () => {
+    const app: TestingModule = await Test.createTestingModule({
+      controllers: [AppController],
+      providers: [AppService],
+    }).compile();
+
+    appController = app.get<AppController>(AppController);
+  });
+
+  describe('root', () => {
+    it('should return "Hello World!"', () => {
+      expect(appController.getHello()).toBe('Hello World!');
+    });
+  });
+});
+
+===== ./backend/src/app.controller.ts =====
+import { Controller, Get } from '@nestjs/common';
+import { AppService } from './app.service';
+
+@Controller()
+export class AppController {
+  constructor(private readonly appService: AppService) {}
+
+  @Get()
+  getHello(): string {
+    return this.appService.getHello();
+  }
+}
+
+===== ./backend/src/modules/transacoes/transacoes.module.ts =====
+import { Module } from '@nestjs/common';
+import { TransacoesController } from './transacoes.controller';
+import { TransacoesService } from './transacoes.service';
+
+@Module({
+  controllers: [TransacoesController],
+  providers: [TransacoesService]
+})
+export class TransacoesModule {}
+
+===== ./backend/src/modules/transacoes/transacoes.controller.ts =====
+import { Controller } from '@nestjs/common';
+
+@Controller('transacoes')
+export class TransacoesController {}
+
+===== ./backend/src/modules/transacoes/transacoes.service.ts =====
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class TransacoesService {}
+
+===== ./backend/src/modules/auth/dto/auth.dto.ts =====
+import { IsEmail, IsString, MinLength, Matches, IsBoolean } from 'class-validator';
+
+export class CadastroDto {
+  @IsString() @MinLength(2) nome: string;
+  @IsEmail() email: string;
+  @IsString() @MinLength(8)
+  @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, { message: 'Senha deve ter letras e números' })
+  senha: string;
+}
+
+export class LoginDto {
+  @IsEmail() email: string;
+  @IsString() senha: string;
+}
+
+export class EsqueciSenhaDto { @IsEmail() email: string; }
+
+export class RedefinirSenhaDto {
+  @IsString() token: string;
+  @IsString() @MinLength(8)
+  @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/) novaSenha: string;
+}
+
+export class RefreshDto { @IsString() refreshToken: string; }
+
+export class BiometriaDto { @IsBoolean() ativa: boolean; }
+
+===== ./backend/src/modules/auth/auth.controller.ts =====
+import { Body, Controller, HttpCode, Ip, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { BiometriaDto, CadastroDto, EsqueciSenhaDto, LoginDto,
+  RedefinirSenhaDto, RefreshDto } from './dto/auth.dto';
+
+@Controller('auth')
+export class AuthController {
+  constructor(private auth: AuthService) {}
+
+  @Post('cadastro') cadastro(@Body() d: CadastroDto) { return this.auth.cadastrar(d); }
+
+  @Post('login') @HttpCode(200)
+  login(@Body() d: LoginDto, @Ip() ip: string) { return this.auth.login(d, ip); }
+
+  @Post('refresh') @HttpCode(200)
+  refresh(@Body() d: RefreshDto) { return this.auth.refresh(d.refreshToken); }
+
+  @Post('esqueci-senha') @HttpCode(200)
+  esqueci(@Body() d: EsqueciSenhaDto) { return this.auth.esqueciSenha(d.email); }
+
+  @Post('redefinir-senha') @HttpCode(200)
+  redefinir(@Body() d: RedefinirSenhaDto) { return this.auth.redefinirSenha(d); }
+
+  @UseGuards(JwtAuthGuard) @Post('logout') @HttpCode(204)
+  logout(@Req() req: any, @Body() d: Partial<RefreshDto>) {
+    return this.auth.logout(req.user.id, req.user.jti, req.user.exp, d.refreshToken);
+  }
+
+  @UseGuards(JwtAuthGuard) @Patch('biometria')
+  biometria(@Req() req: any, @Body() d: BiometriaDto) {
+    return this.auth.definirBiometria(req.user.id, d.ativa);
+  }
+}
+
+===== ./backend/src/modules/auth/jwt.strategy.ts =====
+import { Injectable } from '@nestjs/common';
+import { PassportStrategy } from '@nestjs/passport';
+import { ExtractJwt, Strategy } from 'passport-jwt';
+
+@Injectable()
+export class JwtStrategy extends PassportStrategy(Strategy) {
+  constructor() {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET não definido');
+
+    super({
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      secretOrKey: secret,
+    });
+  }
+
+  validate(payload: { sub: number; email: string }) {
+    return { id: payload.sub, email: payload.email };
+  }
+}
+
+===== ./backend/src/modules/auth/auth.service.ts =====
+import { Inject, Injectable, ConflictException, UnauthorizedException,
+  ForbiddenException, BadRequestException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
+import Redis from 'ioredis';
+import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
+import { CadastroDto, LoginDto, RedefinirSenhaDto } from './dto/auth.dto';
+import { randomBytes, createHash, randomUUID } from 'crypto';
+
+
+const MAX_TENTATIVAS = 5;
+const BLOQUEIO_MIN = 15;
+const RECUPERACAO_MIN = 30;
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private prisma: PrismaService,
+    private jwt: JwtService,
+    private mail: MailService,
+    @Inject('REDIS') private redis: Redis,
+  ) {}
+
+  async cadastrar(dto: CadastroDto) {
+    const email = dto.email.toLowerCase();
+    if (await this.prisma.usuario.findUnique({ where: { email } }))
+      throw new ConflictException('E-mail já cadastrado');
+    const u = await this.prisma.usuario.create({
+      data: { nome: dto.nome, email, senhaHash: await bcrypt.hash(dto.senha, 12) },
+    });
+    await this.auditar(u.id, 'CADASTRO');
+    return { id: u.id, nome: u.nome, email: u.email };
+  }
+
+  async login(dto: LoginDto, ip?: string) {
+    const u = await this.prisma.usuario.findUnique({ where: { email: dto.email.toLowerCase() } });
+    const erro = new UnauthorizedException('E-mail ou senha inválidos');
+    if (!u) throw erro;
+
+    if (u.bloqueadoAte && u.bloqueadoAte > new Date()) {
+      const min = Math.ceil((u.bloqueadoAte.getTime() - Date.now()) / 60000);
+      throw new ForbiddenException(`Conta bloqueada. Tente em ${min} min`);
+    }
+
+    if (!(await bcrypt.compare(dto.senha, u.senhaHash))) {
+      const tentativas = u.tentativasFalhas + 1;
+      const bloquear = tentativas >= MAX_TENTATIVAS;
+      await this.prisma.usuario.update({
+        where: { id: u.id },
+        data: {
+          tentativasFalhas: bloquear ? 0 : tentativas,
+          bloqueadoAte: bloquear ? new Date(Date.now() + BLOQUEIO_MIN * 60000) : null,
+        },
+      });
+      await this.auditar(u.id, bloquear ? 'BLOQUEIO' : 'LOGIN_FALHA', ip);
+      if (bloquear) throw new ForbiddenException(`Conta bloqueada por ${BLOQUEIO_MIN} min`);
+      throw erro;
+    }
+
+    await this.prisma.usuario.update({
+      where: { id: u.id },
+      data: { tentativasFalhas: 0, bloqueadoAte: null, ultimoLogin: new Date() },
+    });
+    await this.auditar(u.id, 'LOGIN', ip);
+    return {
+      ...(await this.gerarTokens(u.id, u.email)),
+      usuario: { id: u.id, nome: u.nome, email: u.email, biometriaAtiva: u.biometriaAtiva },
+    };
+  }
+
+  async refresh(refreshToken: string) {
+    try {
+      const p = await this.jwt.verifyAsync(refreshToken, { secret: process.env.JWT_REFRESH_SECRET });
+      if (p.tipo !== 'refresh' || (await this.redis.exists(`bl:${p.jti}`))) throw new Error();
+      await this.revogar(p.jti, p.exp);
+      return this.gerarTokens(p.sub, p.email);
+    } catch {
+      throw new UnauthorizedException('Sessão expirada');
+    }
+  }
+
+  async logout(userId: number, accessJti: string, accessExp: number, refreshToken?: string) {
+    await this.revogar(accessJti, accessExp);
+    if (refreshToken) {
+      const p = this.jwt.decode(refreshToken) as any;
+      if (p?.jti) await this.revogar(p.jti, p.exp);
+    }
+    await this.auditar(userId, 'LOGOUT');
+  }
+
+  async esqueciSenha(email: string) {
+    const u = await this.prisma.usuario.findUnique({ where: { email: email.toLowerCase() } });
+    if (u) {
+      const token = randomBytes(32).toString('hex');
+      await this.prisma.tokenRecuperacao.updateMany({
+        where: { usuarioId: u.id, usado: false }, data: { usado: true },
+      });
+      await this.prisma.tokenRecuperacao.create({
+        data: {
+          usuarioId: u.id,
+          token: this.hash(token),
+          expiraEm: new Date(Date.now() + RECUPERACAO_MIN * 60000),
+        },
+      });
+
+      await this.mail.enviarRecuperacao(u.email, token);
+      if (process.env.NODE_ENV !== 'production')
+        console.log(`[DEV] Token de ${u.email}: ${token}`);
+
+      await this.auditar(u.id, 'RECUPERACAO_SOLICITADA');
+    }
+    return { mensagem: 'Se o e-mail existir, enviaremos as instruções.' };
+  }
+
+  async redefinirSenha(dto: RedefinirSenhaDto) {
+    const t = await this.prisma.tokenRecuperacao.findUnique({ where: { token: this.hash(dto.token) } });
+    if (!t || t.usado || t.expiraEm < new Date())
+      throw new BadRequestException('Token inválido ou expirado');
+
+    await this.prisma.$transaction([
+      this.prisma.tokenRecuperacao.update({ where: { id: t.id }, data: { usado: true } }),
+      this.prisma.usuario.update({
+        where: { id: t.usuarioId },
+        data: { senhaHash: await bcrypt.hash(dto.novaSenha, 12), tentativasFalhas: 0, bloqueadoAte: null },
+      }),
+    ]);
+    await this.auditar(t.usuarioId, 'SENHA_REDEFINIDA');
+    return { mensagem: 'Senha alterada com sucesso' };
+  }
+
+  async definirBiometria(userId: number, ativa: boolean) {
+    await this.prisma.usuario.update({ where: { id: userId }, data: { biometriaAtiva: ativa } });
+    await this.auditar(userId, ativa ? 'BIOMETRIA_ATIVADA' : 'BIOMETRIA_DESATIVADA');
+    return { biometriaAtiva: ativa };
+  }
+
+  // ---------- auxiliares ----------
+    private async gerarTokens(sub: number, email: string) {
+    const accessToken = await this.jwt.signAsync(
+      { sub, email, tipo: 'access', jti: randomUUID() },
+      { secret: process.env.JWT_SECRET, expiresIn: '15m' },
+    );
+    const refreshToken = await this.jwt.signAsync(
+      { sub, email, tipo: 'refresh', jti: randomUUID() },
+      { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' },
+    );
+    return { accessToken, refreshToken };
+  }
+
+
+  private async revogar(jti: string, exp: number) {
+    const ttl = exp - Math.floor(Date.now() / 1000);
+    if (ttl > 0) await this.redis.set(`bl:${jti}`, '1', 'EX', ttl);
+  }
+
+  private hash(v: string) { return createHash('sha256').update(v).digest('hex'); }
+
+  private auditar(usuarioId: number, acao: string, ip?: string) {
+    return this.prisma.logAuditoria.create({ data: { usuarioId, acao, recurso: 'auth', ip } });
+  }
+}
+
+===== ./backend/src/modules/auth/jwt-auth.guard.ts =====
+import { Injectable } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+
+@Injectable()
+export class JwtAuthGuard extends AuthGuard('jwt') {}
+
+===== ./backend/src/modules/auth/auth.module.ts =====
+import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { JwtStrategy } from './jwt.strategy';
+import { MailService } from '../mail/mail.service';
+
+
+@Module({
+  imports: [PassportModule, JwtModule.register({})],
+  controllers: [AuthController],
+  providers: [AuthService, JwtStrategy, MailService],
+  exports: [AuthService],
+})
+export class AuthModule {}
+
+===== ./backend/src/modules/alexa/alexa.service.ts =====
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class AlexaService {}
+
+===== ./backend/src/modules/alexa/alexa.module.ts =====
+import { Module } from '@nestjs/common';
+import { AlexaController } from './alexa.controller';
+import { AlexaService } from './alexa.service';
+
+@Module({
+  controllers: [AlexaController],
+  providers: [AlexaService]
+})
+export class AlexaModule {}
+
+===== ./backend/src/modules/alexa/alexa.controller.ts =====
+import { Controller } from '@nestjs/common';
+
+@Controller('alexa')
+export class AlexaController {}
+
+===== ./backend/src/modules/mail/mail.service.ts =====
+import { Injectable, Logger } from '@nestjs/common';
+import * as nodemailer from 'nodemailer';
+
+@Injectable()
+export class MailService {
+  private logger = new Logger(MailService.name);
+  private transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT),
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+
+  async enviarRecuperacao(email: string, token: string) {
+    const link = `${process.env.FRONTEND_URL}/redefinir-senha?token=${token}`;
+    try {
+      await this.transporter.sendMail({
+        from: process.env.SMTP_FROM,
+        to: email,
+        subject: 'Recuperação de senha',
+        html: `<p>Clique para redefinir sua senha (válido por 30 min):</p>
+               <p><a href="${link}">${link}</a></p>`,
+      });
+      this.logger.log(`E-mail de recuperação enviado para ${email}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.logger.error(`Falha ao enviar e-mail: ${msg}`);
+    }
+  }
+}
+
+===== ./backend/src/modules/alertas/alertas.module.ts =====
+import { Module } from '@nestjs/common';
+import { AlertasController } from './alertas.controller';
+import { AlertasService } from './alertas.service';
+
+@Module({
+  controllers: [AlertasController],
+  providers: [AlertasService]
+})
+export class AlertasModule {}
+
+===== ./backend/src/modules/alertas/alertas.controller.ts =====
+import { Controller } from '@nestjs/common';
+
+@Controller('alertas')
+export class AlertasController {}
+
+===== ./backend/src/modules/alertas/alertas.service.ts =====
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class AlertasService {}
+
+===== ./backend/src/modules/usuarios/usuarios.controller.ts =====
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UsuariosService } from './usuarios.service';
+
+@Controller('usuarios')
+@UseGuards(JwtAuthGuard)
+export class UsuariosController {
+  constructor(private usuarios: UsuariosService) {}
+
+  @Get('me')
+  me(@Req() req: any) {
+    // Funciona se o validate() da strategy retornar { id } ou o payload { sub }
+    const id = Number(req.user.id ?? req.user.sub);
+    return this.usuarios.me(id);
+  }
+}
+
+===== ./backend/src/modules/usuarios/usuarios.module.ts =====
+import { Module } from '@nestjs/common';
+import { UsuariosController } from './usuarios.controller';
+import { UsuariosService } from './usuarios.service';
+import { PrismaModule } from '../../prisma/prisma.module';
+
+
+@Module({
+  imports: [PrismaModule],
+  controllers: [UsuariosController],
+  providers: [UsuariosService],
+})
+export class UsuariosModule {}
+
+===== ./backend/src/modules/usuarios/usuarios.service.ts =====
+
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+
+@Injectable()
+export class UsuariosService {
+  constructor(private prisma: PrismaService) {}
+
+  async me(id: number) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+        biometriaAtiva: true,
+        dataCadastro: true,
+        ultimoLogin: true,
+        _count: { select: { consentimentos: true, regrasAlerta: true } },
+      },
+    });
+    if (!usuario) throw new NotFoundException('Usuário não encontrado');
+    return usuario;
+  }
+}
+
+===== ./backend/src/modules/categorias/categorias.service.ts =====
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class CategoriasService {}
+
+===== ./backend/src/modules/categorias/categorias.module.ts =====
+import { Module } from '@nestjs/common';
+import { CategoriasController } from './categorias.controller';
+import { CategoriasService } from './categorias.service';
+
+@Module({
+  controllers: [CategoriasController],
+  providers: [CategoriasService]
+})
+export class CategoriasModule {}
+
+===== ./backend/src/modules/categorias/categorias.controller.ts =====
+import { Controller } from '@nestjs/common';
+
+@Controller('categorias')
+export class CategoriasController {}
+
+===== ./backend/src/modules/consentimentos/consentimentos.controller.ts =====
+import { Controller } from '@nestjs/common';
+
+@Controller('consentimentos')
+export class ConsentimentosController {}
+
+===== ./backend/src/modules/consentimentos/consentimentos.service.ts =====
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class ConsentimentosService {}
+
+===== ./backend/src/modules/consentimentos/consentimentos.module.ts =====
+import { Module } from '@nestjs/common';
+import { ConsentimentosController } from './consentimentos.controller';
+import { ConsentimentosService } from './consentimentos.service';
+
+@Module({
+  controllers: [ConsentimentosController],
+  providers: [ConsentimentosService]
+})
+export class ConsentimentosModule {}
+
+===== ./backend/src/modules/notificacoes/notificacoes.controller.ts =====
+import { Controller } from '@nestjs/common';
+
+@Controller('notificacoes')
+export class NotificacoesController {}
+
+===== ./backend/src/modules/notificacoes/notificacoes.service.ts =====
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class NotificacoesService {}
+
+===== ./backend/src/modules/notificacoes/notificacoes.module.ts =====
+import { Module } from '@nestjs/common';
+import { NotificacoesController } from './notificacoes.controller';
+import { NotificacoesService } from './notificacoes.service';
+
+@Module({
+  controllers: [NotificacoesController],
+  providers: [NotificacoesService]
+})
+export class NotificacoesModule {}
+
+===== ./backend/src/modules/pluggy/pluggy.controller.spec.ts =====
+import { Test, TestingModule } from '@nestjs/testing';
+import { PluggyController } from './pluggy.controller';
+
+describe('PluggyController', () => {
+  let controller: PluggyController;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [PluggyController],
+    }).compile();
+
+    controller = module.get<PluggyController>(PluggyController);
+  });
+
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
+});
+
+===== ./backend/src/modules/pluggy/pluggy.service.ts =====
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class PluggyService {}
+
+===== ./backend/src/modules/pluggy/pluggy.module.ts =====
+import { Module } from '@nestjs/common';
+import { PluggyController } from './pluggy.controller';
+import { PluggyService } from './pluggy.service';
+
+@Module({
+  controllers: [PluggyController],
+  providers: [PluggyService]
+})
+export class PluggyModule {}
+
+===== ./backend/src/modules/pluggy/pluggy.service.spec.ts =====
+import { Test, TestingModule } from '@nestjs/testing';
+import { PluggyService } from './pluggy.service';
+
+describe('PluggyService', () => {
+  let service: PluggyService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [PluggyService],
+    }).compile();
+
+    service = module.get<PluggyService>(PluggyService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+});
+
+===== ./backend/src/modules/pluggy/pluggy.controller.ts =====
+import { Controller } from '@nestjs/common';
+
+@Controller('pluggy')
+export class PluggyController {}
+
+===== ./backend/src/modules/contas/contas.controller.ts =====
+import { Controller } from '@nestjs/common';
+
+@Controller('contas')
+export class ContasController {}
+
+===== ./backend/src/modules/contas/contas.service.ts =====
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class ContasService {}
+
+===== ./backend/src/modules/contas/contas.module.ts =====
+import { Module } from '@nestjs/common';
+import { ContasController } from './contas.controller';
+import { ContasService } from './contas.service';
+
+@Module({
+  controllers: [ContasController],
+  providers: [ContasService]
+})
+export class ContasModule {}
+
+===== ./backend/src/modules/auditoria/auditoria.service.ts =====
+import { Injectable } from '@nestjs/common';
+
+@Injectable()
+export class AuditoriaService {}
+
+===== ./backend/src/modules/auditoria/auditoria.module.ts =====
+import { Module } from '@nestjs/common';
+import { AuditoriaController } from './auditoria.controller';
+import { AuditoriaService } from './auditoria.service';
+
+@Module({
+  controllers: [AuditoriaController],
+  providers: [AuditoriaService]
+})
+export class AuditoriaModule {}
+
+===== ./backend/src/modules/auditoria/auditoria.controller.ts =====
+import { Controller } from '@nestjs/common';
+
+@Controller('auditoria')
+export class AuditoriaController {}
+
+===== ./backend/prisma/schema.prisma =====
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id               Int       @id @default(autoincrement())
+  nome             String
+  email            String    @unique
+  senhaHash        String    @map("senha_hash")
+  biometriaAtiva   Boolean   @default(false) @map("biometria_ativa")
+  dataCadastro     DateTime  @default(now()) @map("data_cadastro")
+  ultimoLogin      DateTime? @map("ultimo_login")
+  tentativasFalhas Int       @default(0) @map("tentativas_falhas")
+  bloqueadoAte     DateTime? @map("bloqueado_ate")
+
+  tokensRecuperacao TokenRecuperacao[]
+  vinculosAlexa     VinculoAlexa[]
+  consentimentos    Consentimento[]
+  categorias        Categoria[]
+  regrasAlerta      RegraAlerta[]
+  logs              LogAuditoria[]
+
+  @@map("usuario")
+}
+
+model TokenRecuperacao {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int      @map("usuario_id")
+  token     String   @unique
+  expiraEm  DateTime @map("expira_em")
+  usado     Boolean  @default(false)
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("token_recuperacao")
+}
+
+model VinculoAlexa {
+  id           Int      @id @default(autoincrement())
+  usuarioId    Int      @map("usuario_id")
+  alexaUserId  String   @map("alexa_user_id")
+  accessToken  String   @map("access_token")
+  refreshToken String   @map("refresh_token")
+  expiraEm     DateTime @map("expira_em")
+  ativo        Boolean  @default(true)
+  dataVinculo  DateTime @default(now()) @map("data_vinculo")
+  usuario      Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("vinculo_alexa")
+}
+
+model Instituicao {
+  id             Int             @id @default(autoincrement())
+  nome           String
+  codigoPluggy   String          @map("codigo_pluggy")
+  logoUrl        String?         @map("logo_url")
+  consentimentos Consentimento[]
+
+  @@map("instituicao")
+}
+
+model Consentimento {
+  id                Int       @id @default(autoincrement())
+  usuarioId         Int       @map("usuario_id")
+  instituicaoId     Int       @map("instituicao_id")
+  itemIdPluggy      String    @map("item_id_pluggy")
+  status            String
+  dataConsentimento DateTime  @default(now()) @map("data_consentimento")
+  dataExpiracao     DateTime? @map("data_expiracao")
+  dataRevogacao     DateTime? @map("data_revogacao")
+  usuario           Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  instituicao       Instituicao @relation(fields: [instituicaoId], references: [id])
+  contas            ContaBancaria[]
+
+  @@map("consentimento")
+}
+
+model ContaBancaria {
+  id                  Int       @id @default(autoincrement())
+  consentimentoId     Int       @map("consentimento_id")
+  idExternoPluggy     String    @unique @map("id_externo_pluggy")
+  tipo                String
+  numeroMascarado     String    @map("numero_mascarado")
+  saldoAtual          Decimal   @db.Decimal(14, 2) @map("saldo_atual")
+  moeda               String    @default("BRL")
+  ultimaSincronizacao DateTime? @map("ultima_sincronizacao")
+  consentimento       Consentimento @relation(fields: [consentimentoId], references: [id], onDelete: Cascade)
+  transacoes          Transacao[]
+
+  @@map("conta_bancaria")
+}
+
+model Categoria {
+  id            Int     @id @default(autoincrement())
+  usuarioId     Int?    @map("usuario_id")
+  nome          String
+  tipo          String
+  icone         String?
+  padraoSistema Boolean @default(false) @map("padrao_sistema")
+  usuario       Usuario?      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  transacoes    Transacao[]
+  regrasAlerta  RegraAlerta[]
+
+  @@map("categoria")
+}
+
+model Transacao {
+  id                           Int      @id @default(autoincrement())
+  contaId                      Int      @map("conta_id")
+  categoriaId                  Int?     @map("categoria_id")
+  idExternoPluggy              String   @unique @map("id_externo_pluggy")
+  descricao                    String
+  valor                        Decimal  @db.Decimal(14, 2)
+  tipo                         String
+  data                         DateTime
+  metodoPagamento              String?  @map("metodo_pagamento")
+  categoriaAjustadaManualmente Boolean  @default(false) @map("categoria_ajustada_manualmente")
+  conta                        ContaBancaria  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  categoria                    Categoria?     @relation(fields: [categoriaId], references: [id])
+  notificacoes                 Notificacao[]
+
+  @@index([contaId, data(sort: Desc)])
+  @@map("transacao")
+}
+
+model RegraAlerta {
+  id           Int      @id @default(autoincrement())
+  usuarioId    Int      @map("usuario_id")
+  tipoEvento   String   @map("tipo_evento")
+  operador     String?
+  valorLimite  Decimal? @db.Decimal(14, 2) @map("valor_limite")
+  categoriaId  Int?     @map("categoria_id")
+  canal        String
+  ativa        Boolean  @default(true)
+  dataCriacao  DateTime @default(now()) @map("data_criacao")
+  usuario      Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  categoria    Categoria? @relation(fields: [categoriaId], references: [id])
+  notificacoes Notificacao[]
+
+  @@map("regra_alerta")
+}
+
+model Notificacao {
+  id          Int       @id @default(autoincrement())
+  regraId     Int       @map("regra_id")
+  transacaoId Int?      @map("transacao_id")
+  mensagem    String
+  canal       String
+  statusEnvio String    @map("status_envio")
+  dataEnvio   DateTime? @map("data_envio")
+  lida        Boolean   @default(false)
+  regra       RegraAlerta @relation(fields: [regraId], references: [id], onDelete: Cascade)
+  transacao   Transacao?  @relation(fields: [transacaoId], references: [id], onDelete: Cascade)
+
+  @@unique([regraId, transacaoId]) // idempotência (HU10)
+  @@map("notificacao")
+}
+
+model LogAuditoria {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int      @map("usuario_id")
+  acao      String
+  recurso   String
+  ip        String?
+  dataHora  DateTime @default(now()) @map("data_hora")
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("log_auditoria")
+}

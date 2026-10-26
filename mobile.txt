@@ -1,0 +1,420 @@
+
+===== ./mobile/app/index.tsx =====
+import { useEffect, useState } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import * as LocalAuthentication from "expo-local-authentication";
+import * as Crypto from "expo-crypto";
+
+async function gerarHash(senha: string) {
+  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, senha);
+}
+
+export default function Login() {
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [bioDisponivel, setBioDisponivel] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const hw = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      const hash = await SecureStore.getItemAsync("passwordHash");
+      setBioDisponivel(hw && enrolled && !!hash);
+    })();
+  }, []);
+
+  async function entrar() {
+    const mail = email.trim().toLowerCase();
+
+    if (!mail || !senha) return Alert.alert("Erro", "Preencha e-mail e senha.");
+    if (!/^\S+@\S+\.\S+$/.test(mail)) return Alert.alert("Erro", "E-mail inválido.");
+    if (senha.length < 6) return Alert.alert("Erro", "A senha deve ter no mínimo 6 caracteres.");
+
+    const emailSalvo = await SecureStore.getItemAsync("savedEmail");
+    const hashSalvo = await SecureStore.getItemAsync("passwordHash");
+    const hashDigitado = await gerarHash(senha);
+
+    if (!emailSalvo || !hashSalvo) {
+      await SecureStore.setItemAsync("savedEmail", mail);
+      await SecureStore.setItemAsync("passwordHash", hashDigitado);
+      Alert.alert("Conta criada", "Seu acesso foi cadastrado.");
+    } else if (mail !== emailSalvo || hashDigitado !== hashSalvo) {
+      return Alert.alert("Erro", "E-mail ou senha incorretos.");
+    }
+
+    await SecureStore.setItemAsync("token", "token-fake");
+    router.replace("/(tabs)");
+  }
+
+  async function entrarComBiometria() {
+    const res = await LocalAuthentication.authenticateAsync({
+      promptMessage: "Entrar no FinançasApp",
+      cancelLabel: "Cancelar",
+    });
+    if (res.success) {
+      await SecureStore.setItemAsync("token", "token-fake");
+      router.replace("/(tabs)");
+    }
+  }
+
+  return (
+    <View style={s.container}>
+      <Text style={s.title}>FinançasApp</Text>
+      <TextInput style={s.input} placeholder="E-mail" autoCapitalize="none"
+        keyboardType="email-address" value={email} onChangeText={setEmail} />
+      <TextInput style={s.input} placeholder="Senha" secureTextEntry
+        value={senha} onChangeText={setSenha} />
+      <TouchableOpacity style={s.btn} onPress={entrar}>
+        <Text style={s.btnText}>Entrar</Text>
+      </TouchableOpacity>
+      {bioDisponivel && (
+        <TouchableOpacity style={[s.btn, s.btnOutline]} onPress={entrarComBiometria}>
+          <Text style={[s.btnText, { color: "#2563eb" }]}>Entrar com Face ID</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  container: { flex: 1, justifyContent: "center", padding: 24, backgroundColor: "#fff" },
+  title: { fontSize: 32, fontWeight: "bold", marginBottom: 32, textAlign: "center" },
+  input: { borderWidth: 1, borderColor: "#ddd", borderRadius: 10, padding: 14, marginBottom: 12, fontSize: 16 },
+  btn: { backgroundColor: "#2563eb", padding: 16, borderRadius: 10, alignItems: "center", marginTop: 8 },
+  btnOutline: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#2563eb" },
+  btnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+});
+
+===== ./mobile/app/login.tsx =====
+import { useEffect, useState } from "react";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import * as LocalAuthentication from "expo-local-authentication";
+
+export default function Login() {
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [bioDisponivel, setBioDisponivel] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const hw = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      const salvo = await SecureStore.getItemAsync("savedEmail");
+      setBioDisponivel(hw && enrolled && !!salvo);
+    })();
+  }, []);
+
+  async function entrar() {
+    if (!email || !senha) return Alert.alert("Erro", "Preencha e-mail e senha.");
+    // TODO: trocar pela chamada real da sua API
+    await SecureStore.setItemAsync("token", "token-fake");
+    await SecureStore.setItemAsync("savedEmail", email);
+    router.replace("/(tabs)");
+  }
+
+  async function entrarComBiometria() {
+    const res = await LocalAuthentication.authenticateAsync({
+      promptMessage: "Entrar no FinançasApp",
+      cancelLabel: "Cancelar",
+    });
+    if (res.success) {
+      await SecureStore.setItemAsync("token", "token-fake");
+      router.replace("/(tabs)");
+    }
+  }
+
+  return (
+    <View style={s.container}>
+      <Text style={s.title}>FinançasApp</Text>
+      <TextInput style={s.input} placeholder="E-mail" autoCapitalize="none"
+        keyboardType="email-address" value={email} onChangeText={setEmail} />
+      <TextInput style={s.input} placeholder="Senha" secureTextEntry
+        value={senha} onChangeText={setSenha} />
+      <TouchableOpacity style={s.btn} onPress={entrar}>
+        <Text style={s.btnText}>Entrar</Text>
+      </TouchableOpacity>
+      {bioDisponivel && (
+        <TouchableOpacity style={[s.btn, s.btnOutline]} onPress={entrarComBiometria}>
+          <Text style={[s.btnText, { color: "#2563eb" }]}>Entrar com Face ID</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  container: { flex: 1, justifyContent: "center", padding: 24, backgroundColor: "#fff" },
+  title: { fontSize: 32, fontWeight: "bold", marginBottom: 32, textAlign: "center" },
+  input: { borderWidth: 1, borderColor: "#ddd", borderRadius: 10, padding: 14, marginBottom: 12, fontSize: 16 },
+  btn: { backgroundColor: "#2563eb", padding: 16, borderRadius: 10, alignItems: "center", marginTop: 8 },
+  btnOutline: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#2563eb" },
+  btnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+});
+
+===== ./mobile/app/(tabs)/index.tsx =====
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+
+export default function Dashboard() {
+  async function sair() {
+    await SecureStore.deleteItemAsync("token");
+    router.replace("/login");
+  }
+
+  return (
+    <View style={s.container}>
+      <View style={s.card}>
+        <Text style={s.label}>Saldo atual</Text>
+        <Text style={s.saldo}>R$ 0,00</Text>
+      </View>
+      <View style={s.row}>
+        <View style={[s.mini, { backgroundColor: "#dcfce7" }]}>
+          <Text style={s.label}>Receitas</Text>
+          <Text style={[s.valor, { color: "#16a34a" }]}>R$ 0,00</Text>
+        </View>
+        <View style={[s.mini, { backgroundColor: "#fee2e2" }]}>
+          <Text style={s.label}>Despesas</Text>
+          <Text style={[s.valor, { color: "#dc2626" }]}>R$ 0,00</Text>
+        </View>
+      </View>
+      <TouchableOpacity style={s.sair} onPress={sair}>
+        <Text style={{ color: "#dc2626", fontWeight: "600" }}>Sair</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  container: { flex: 1, padding: 20, backgroundColor: "#f8fafc" },
+  card: { backgroundColor: "#2563eb", borderRadius: 16, padding: 24, marginBottom: 16 },
+  label: { color: "#64748b", fontSize: 14 },
+  saldo: { color: "#fff", fontSize: 36, fontWeight: "bold", marginTop: 4 },
+  row: { flexDirection: "row", gap: 12 },
+  mini: { flex: 1, borderRadius: 12, padding: 16 },
+  valor: { fontSize: 20, fontWeight: "bold", marginTop: 4 },
+  sair: { marginTop: "auto", alignItems: "center", padding: 16 },
+});
+
+===== ./mobile/app/(tabs)/_layout.tsx =====
+import { Tabs } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+
+export default function TabsLayout() {
+  return (
+    <Tabs screenOptions={{ tabBarActiveTintColor: "#2563eb" }}>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "Dashboard",
+          tabBarIcon: ({ color, size }) => <Ionicons name="wallet" color={color} size={size} />,
+        }}
+      />
+    </Tabs>
+  );
+}
+
+===== ./mobile/app/_layout.tsx =====
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+
+export default function RootLayout() {
+  return (
+    <>
+      <StatusBar style="dark" />
+      <Stack screenOptions={{ headerShown: false }} />
+    </>
+  );
+}
+
+===== ./mobile/ios/build/ios/SourcePackages/firebase_messaging-16.7.0/example/bundled-service-worker/firebase-messaging-sw.ts =====
+import { initializeApp } from 'firebase/app';
+import {
+  experimentalSetDeliveryMetricsExportedToBigQueryEnabled,
+  getMessaging,
+  isSupported,
+  onBackgroundMessage
+} from 'firebase/messaging/sw';
+
+declare var self: ServiceWorkerGlobalScope;
+
+self.addEventListener('install', (event) => {
+  console.log(self);
+  console.log(event);
+});
+
+// Focus the existing app tab when a notification is clicked.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if (!client.focused) {
+            return client.focus();
+          }
+        }
+      })
+  );
+});
+
+const app = initializeApp({
+  apiKey: 'AIzaSyB7wZb2tO1-Fs6GbDADUSTs2Qs3w08Hovw',
+  appId: '1:406099696497:web:87e25e51afe982cd3574d0',
+  messagingSenderId: '406099696497',
+  projectId: 'flutterfire-e2e-tests',
+  authDomain: 'flutterfire-e2e-tests.firebaseapp.com',
+  databaseURL:
+      'https://flutterfire-e2e-tests-default-rtdb.europe-west1.firebasedatabase.app',
+  storageBucket: 'flutterfire-e2e-tests.appspot.com',
+  measurementId: 'G-JN95N1JV2E',
+});
+
+isSupported().then((isSupported) => {
+  if (isSupported) {
+    const messaging = getMessaging(app);
+
+    experimentalSetDeliveryMetricsExportedToBigQueryEnabled(messaging, true);
+
+    onBackgroundMessage(messaging, ({ notification: notification }) => {
+      const { title, body, image } = notification ?? {};
+
+      if (!title) {
+        return;
+      }
+
+      self.registration.showNotification(title, {
+        body,
+        icon: image || '/assets/icons/icon-72x72.png',
+      });
+    });
+  }
+});
+
+===== ./mobile/android/app/src/services/api.ts =====
+import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
+
+export const api = axios.create({
+  baseURL: 'http://SEU_IP:3000', // ex: http://192.168.0.15:3000
+});
+
+api.interceptors.request.use(async (config) => {
+  const token = await SecureStore.getItemAsync('accessToken');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+===== ./mobile/android/app/src/services/auth.ts =====
+import { api } from './api';
+import * as SecureStore from 'expo-secure-store';
+
+export async function login(email: string, senha: string) {
+  const { data } = await api.post('/auth/login', { email, senha });
+  await SecureStore.setItemAsync('accessToken', data.accessToken);
+  await SecureStore.setItemAsync('refreshToken', data.refreshToken);
+  return data;
+}
+
+export async function cadastro(nome: string, email: string, senha: string) {
+  const { data } = await api.post('/auth/cadastro', { nome, email, senha });
+  return data;
+}
+
+export async function logout() {
+  await api.post('/auth/logout');
+  await SecureStore.deleteItemAsync('accessToken');
+  await SecureStore.deleteItemAsync('refreshToken');
+}
+
+===== ./mobile/build/ios/SourcePackages/firebase_messaging-16.7.0/example/bundled-service-worker/firebase-messaging-sw.ts =====
+import { initializeApp } from 'firebase/app';
+import {
+  experimentalSetDeliveryMetricsExportedToBigQueryEnabled,
+  getMessaging,
+  isSupported,
+  onBackgroundMessage
+} from 'firebase/messaging/sw';
+
+declare var self: ServiceWorkerGlobalScope;
+
+self.addEventListener('install', (event) => {
+  console.log(self);
+  console.log(event);
+});
+
+// Focus the existing app tab when a notification is clicked.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if (!client.focused) {
+            return client.focus();
+          }
+        }
+      })
+  );
+});
+
+const app = initializeApp({
+  apiKey: 'AIzaSyB7wZb2tO1-Fs6GbDADUSTs2Qs3w08Hovw',
+  appId: '1:406099696497:web:87e25e51afe982cd3574d0',
+  messagingSenderId: '406099696497',
+  projectId: 'flutterfire-e2e-tests',
+  authDomain: 'flutterfire-e2e-tests.firebaseapp.com',
+  databaseURL:
+      'https://flutterfire-e2e-tests-default-rtdb.europe-west1.firebasedatabase.app',
+  storageBucket: 'flutterfire-e2e-tests.appspot.com',
+  measurementId: 'G-JN95N1JV2E',
+});
+
+isSupported().then((isSupported) => {
+  if (isSupported) {
+    const messaging = getMessaging(app);
+
+    experimentalSetDeliveryMetricsExportedToBigQueryEnabled(messaging, true);
+
+    onBackgroundMessage(messaging, ({ notification: notification }) => {
+      const { title, body, image } = notification ?? {};
+
+      if (!title) {
+        return;
+      }
+
+      self.registration.showNotification(title, {
+        body,
+        icon: image || '/assets/icons/icon-72x72.png',
+      });
+    });
+  }
+});
+
+===== ./mobile/src/services/auth.ts =====
+import { api } from './api';
+import * as SecureStore from 'expo-secure-store';
+
+export async function login(email: string, senha: string) {
+  const { data } = await api.post('/auth/login', { email, senha });
+  await SecureStore.setItemAsync('accessToken', data.accessToken);
+  await SecureStore.setItemAsync('refreshToken', data.refreshToken);
+  return data;
+}
+
+export async function cadastro(nome: string, email: string, senha: string) {
+  const { data } = await api.post('/auth/cadastro', { nome, email, senha });
+  return data;
+}
+
+export async function logout() {
+  await api.post('/auth/logout');
+  await SecureStore.deleteItemAsync('accessToken');
+  await SecureStore.deleteItemAsync('refreshToken');
+}

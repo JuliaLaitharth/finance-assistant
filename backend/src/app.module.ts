@@ -4,7 +4,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
-import { PluggyModule } from './pluggy/pluggy.module';
+import { PluggyModule } from './modules/pluggy/pluggy.module';
 
 
 @Module({

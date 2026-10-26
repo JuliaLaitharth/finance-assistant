@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "FinançasApp",
+    "slug": "financasapp",
+    "scheme": "financasapp",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Permitir que o FinançasApp use o Face ID para entrar."
+        }
+      ],
+      "expo-status-bar"
+    ]
+  }
+}

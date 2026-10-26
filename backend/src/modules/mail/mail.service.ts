@@ -11,7 +11,7 @@ export class MailService {
   });
 
   async enviarRecuperacao(email: string, token: string) {
-    const link = `${process.env.FRONTEND_URL}/redefinir-senha?token=${token}`;
+    const link = `financasapp://redefinir-senha?token=${token}`;
     try {
       await this.transporter.sendMail({
         from: process.env.SMTP_FROM,
